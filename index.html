@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The number site</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            transition: background-color 0.3s ease;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 90vw;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: rgba(0, 0, 0, 0.7);
+            letter-spacing: 2px;
+        }
+
+        #number {
+            font-size: 120px;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: rgba(0, 0, 0, 0.8);
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            word-wrap: break-word;
+            line-height: 1.2;
+        }
+
+        #number.bump {
+            transform: scale(1.1);
+        }
+
+        #number.huge {
+            font-size: 48px;
+        }
+
+        #number.massive {
+            font-size: 24px;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+        }
+
+        button {
+            width: 90px;
+            height: 90px;
+            border: none;
+            border-radius: 50%;
+            font-size: 48px;
+            font-weight: bold;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.1s ease;
+            color: white;
+            box-shadow: 0 8px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+        }
+
+        button:active {
+            transform: translateY(8px);
+            box-shadow: 0 0 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .minus {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .plus {
+            background: linear-gradient(135deg, #667eea 0%, #4da3ff 100%);
+        }
+
+        button::after {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            border-radius: 50%;
+            background: inherit;
+            filter: blur(20px);
+            opacity: 0.3;
+            z-index: -1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>THE NUMBER</h1>
+        <div id="number">0</div>
+        <div class="buttons">
+            <button class="minus" onclick="send('-')">−</button>
+            <button class="plus" onclick="send('+')">+</button>
+        </div>
+    </div>
+
+    <script>
+        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        const numberEl = document.getElementById('number');
+        let reconnectAttempts = 0;
+
+        function getColor(numStr) {
+            // Parse sign and rough magnitude
+            const isNegative = numStr.startsWith('-');
+            const absStr = isNegative ? numStr.slice(1) : numStr;
+            const magnitude = absStr.length;
+
+            if (numStr === '0') {
+                return `hsl(0, 0%, 85%)`;
+            } else if (isNegative) {
+                // Red for negative, intensity based on magnitude
+                const intensity = Math.min(magnitude * 5, 70);
+                return `hsl(0, ${intensity}%, 85%)`;
+            } else {
+                // Blue for positive, intensity based on magnitude
+                const intensity = Math.min(magnitude * 5, 70);
+                return `hsl(210, ${intensity}%, 85%)`;
+            }
+        }
+
+        function formatNumber(numStr) {
+            const len = numStr.replace('-', '').length;
+
+            // Adjust font size based on digit count
+            numberEl.classList.remove('huge', 'massive');
+            if (len > 50) {
+                numberEl.classList.add('massive');
+            } else if (len > 20) {
+                numberEl.classList.add('huge');
+            }
+
+            return numStr;
+        }
+
+        ws.onmessage = (e) => {
+            const numStr = e.data;
+            numberEl.textContent = formatNumber(numStr);
+            document.body.style.backgroundColor = getColor(numStr);
+
+            // Trigger bump animation
+            numberEl.classList.remove('bump');
+            void numberEl.offsetWidth;
+            numberEl.classList.add('bump');
+            setTimeout(() => numberEl.classList.remove('bump'), 200);
+        };
+
+        ws.onclose = () => {
+            if (reconnectAttempts < 5) {
+                setTimeout(() => {
+                    reconnectAttempts++;
+                    location.reload();
+                }, 1000 * reconnectAttempts);
+            }
+        };
+
+        function send(action) {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(action);
+            }
+        }
+    </script>
+</body>
+
+</html>
