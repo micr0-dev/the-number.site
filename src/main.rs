@@ -10,7 +10,6 @@ use num_traits::One;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 use tokio::time::{interval, Duration};
-use std::path::Path;
 
 type SharedState = Arc<Mutex<BigInt>>;
 
@@ -46,6 +45,12 @@ async fn periodic_save_task(state: SharedState) {
 
 #[tokio::main]
 async fn main() {
+    // Get port from environment variable or default to 3000
+    let port = std::env::var("PORT")
+        .unwrap_or_else(|_| "3000".to_string())
+        .parse::<u16>()
+        .expect("PORT must be a valid number");
+
     let initial_value = load_state().await;
     let state = Arc::new(Mutex::new(initial_value));
     let (tx, _) = broadcast::channel::<String>(1000);
@@ -61,8 +66,9 @@ async fn main() {
         .route("/ws", get(ws_handler))
         .with_state((state, tx));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("Server running on http://0.0.0.0:3000");
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    println!("Server running on http://{}", addr);
     axum::serve(listener, app).await.unwrap();
 }
 
